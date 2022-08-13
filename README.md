@@ -4,10 +4,14 @@ Hello!
 
 This is a test README, there are many like it but this one is mine! Pay it no mind :)
 
-I can add 
-# extra
-## large
-### HEADINGS
+I can add:
 
-Make my test **bold** and > brash
-or trow it in the trash
+### extra
+
+## large
+
+# HEADINGS
+
+Make my test **bold** and > brash...
+
+...or throw it in the trash!
