@@ -1,3 +1,9 @@
+import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
+from vasttools.pipeline import Pipeline
+from vasttools.query import Query
+import numpy as np
+
 #function used to sort the classes in the catalogue into families
 def family_sort(cms):
     AGN_Family=[
@@ -103,13 +109,30 @@ def family_sort(cms):
     cms['family']=Source_Families
 
 
-#Defining the photometry plotting function here to save having to rerun it everytime:
-
-def plot_photometry(pdf):
-    fig = plt.figure(figsize=(12, 5))
-
+#defining the photometry plotting function here to save having to rerun it everytime.
+#have to load VAST run and the FINK requested sources and feed them into the input
+def plot_lightcurves(my_run,fsd,VAST_ID,FINK_ID):
+    
+    gs = gridspec.GridSpec(2,1) #sets up a 2x1 grid
+    vast_gs = gs[1:2] #puts the VAST axis on the bottom
+    
+    vast_source=my_run.get_source(VAST_ID)
+     
+    fig = vast_source.plot_lightcurve(figsize=(15,6),mjd=True)
+    vast_ax = fig.axes[0]
+    vast_ax.set_title(None)
+    
+    vast_ax.set_position(vast_gs.get_position(fig))
+    vast_ax.set_subplotspec(vast_gs)
+    
+    ax_new = fig.add_subplot(211, sharex=vast_ax)
+    ax_new.tick_params(labelbottom=False)
+    plt.tight_layout()
+    
+    pdf=fsd[fsd['i:objectId'] == FINK_ID]
+    
     colordic = {1: 'C0', 2: 'C1'}
-
+    
     for filt in np.unique(pdf['i:fid']):
         maskFilt = pdf['i:fid'] == filt
 
@@ -138,6 +161,51 @@ def plot_photometry(pdf):
         )
 
     plt.gca().invert_yaxis()
-    plt.xlabel('Modified Julian Date')
+    #plt.xlabel('Modified Julian Date')
     plt.ylabel('Magnitude')
     plt.show()
+    
+def plot_cutouts(my_run,fsd,VAST_ID,FINK_ID,vast_epoch):
+    
+    #defining column array for cutouts
+    cutouts=[
+    'b:cutoutScience_stampData',
+    'b:cutoutTemplate_stampData',
+    'b:cutoutDifference_stampData'
+    ]
+
+    fsd_source=fsd[fsd['i:objectId'] == FINK_ID]
+    vast_source=my_run.get_source(VAST_ID)
+    
+    fig, axes = plt.subplots(1, 3, figsize=(15, 6))
+
+    for col in cutouts:
+        data = fsd_source[col].values[0]
+        axes[cutouts.index(col)].imshow(np.arcsinh(data))
+        
+    cutout = vast_source.show_png_cutout(vast_epoch)
+    all_cutouts = vast_source.show_all_png_cutouts(columns=3, figsize=(10,10))
+
+    #This function takes in the crossmatched catalogue, the run from VAST and the eta and v threshholds calculated from
+    #eta_v_analysis():
+    
+def eta_v_candidate_filter(cms,my_run,eta_thresh,v_thresh):
+    
+    #list of VAST ids:
+    matched_ids=cms['matched_id'].astype(int).to_list()
+    #this creates an arrray of sources from my_run that have the same ids as the catalogue, with the necessary eta and V information
+    sel=my_run.sources[my_run.sources.index.isin(matched_ids)]
+    
+    #we already got the VAST info on our crossmatched sources through sel. we just need to filter for the highly variable
+    #sources based on the eta and v threshholds we calculated before:
+    candidate_sel = sel[(sel['eta_peak'] >= eta_thresh) & (sel['v_peak'] >= v_thresh)]
+
+    #getting the sel_candidate ids is squirrely, since they're the row INDEX of the dataframe. 
+    #passing eta_v_candidates['id'] will not work. The below code pulls out those index values as a string list:
+    candidate_ids=candidate_sel.index.values.astype('str').tolist()
+
+    #then we just check how many objects in cmf have an id that match the candidate ids
+    candidate_cms=cms[cms['matched_id'].isin(candidate_ids)]
+    print('There are',len(candidate_cms),'candidate sources:')
+    
+    return candidate_cms
