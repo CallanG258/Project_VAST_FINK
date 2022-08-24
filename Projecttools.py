@@ -110,14 +110,14 @@ def family_sort(cms):
 
 
 #defining the photometry plotting function here to save having to rerun it everytime.
-#have to load VAST run and the FINK requested sources and feed them into the input
-def plot_lightcurves(my_run,fsd,VAST_ID,FINK_ID):
+#have to load VAST run, the FINK requested sources AND the filtered candidate catalogue and feed them into the input
+def plot_lightcurves(my_run,fsd,candidates,FINK_ID):
     
     gs = gridspec.GridSpec(2,1) #sets up a 2x1 grid
     vast_gs = gs[1:2] #puts the VAST axis on the bottom
     
-    vast_source=my_run.get_source(VAST_ID)
-     
+    vast_source=my_run.get_source(candidates[candidates['objectId'] == FINK_ID]['matched_id'].astype(int).values[0])
+    
     fig = vast_source.plot_lightcurve(figsize=(15,6),mjd=True)
     vast_ax = fig.axes[0]
     vast_ax.set_title(None)
@@ -165,7 +165,7 @@ def plot_lightcurves(my_run,fsd,VAST_ID,FINK_ID):
     plt.ylabel('Magnitude')
     plt.show()
     
-def plot_cutouts(my_run,fsd,VAST_ID,FINK_ID,vast_epoch):
+def plot_cutouts(my_run,fsd,candidates,FINK_ID,vast_epoch):
     
     #defining column array for cutouts
     cutouts=[
@@ -175,7 +175,7 @@ def plot_cutouts(my_run,fsd,VAST_ID,FINK_ID,vast_epoch):
     ]
 
     fsd_source=fsd[fsd['i:objectId'] == FINK_ID]
-    vast_source=my_run.get_source(VAST_ID)
+    vast_source=my_run.get_source(candidates[candidates['objectId'] == FINK_ID]['matched_id'].astype(int).values[0])
     
     fig, axes = plt.subplots(1, 3, figsize=(15, 6))
 
