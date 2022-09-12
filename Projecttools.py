@@ -111,7 +111,7 @@ def family_sort(cms):
 
 #defining the photometry plotting function here to save having to rerun it everytime.
 #have to load VAST run, the FINK requested sources AND the filtered candidate catalogue and feed them into the input
-def plot_lightcurves(my_run,fsd,candidates,FINK_ID):
+def plot_lightcurves(my_run,fsd,candidates,FINK_ID,xlim,vast_ylim,fink_ylim,):
     
     gs = gridspec.GridSpec(2,1) #sets up a 2x1 grid
     vast_gs = gs[1:2] #puts the VAST axis on the bottom
@@ -124,6 +124,8 @@ def plot_lightcurves(my_run,fsd,candidates,FINK_ID):
     
     vast_ax.set_position(vast_gs.get_position(fig))
     vast_ax.set_subplotspec(vast_gs)
+    vast_ax.set_xlim(xlim)
+    vast_ax.set_ylim(vast_ylim)
     
     ax_new = fig.add_subplot(211, sharex=vast_ax)
     ax_new.tick_params(labelbottom=False)
@@ -163,6 +165,8 @@ def plot_lightcurves(my_run,fsd,candidates,FINK_ID):
     plt.gca().invert_yaxis()
     #plt.xlabel('Modified Julian Date')
     plt.ylabel('Magnitude')
+    plt.xlim(xlim)
+    plt.ylim(fink_ylim)
     plt.show()
     
 def plot_cutouts(my_run,fsd,candidates,FINK_ID,vast_epoch):
