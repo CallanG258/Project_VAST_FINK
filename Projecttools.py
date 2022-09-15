@@ -1,8 +1,13 @@
+#here are the necessary imports
+import os
+import requests
+import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
+from io import StringIO
 from vasttools.pipeline import Pipeline
 from vasttools.query import Query
-import numpy as np
 
 #function used to sort the classes in the catalogue into families
 def family_sort(cms):
@@ -197,7 +202,8 @@ def eta_v_candidate_filter(cms,my_run,eta_thresh,v_thresh):
     
     #list of VAST ids:
     matched_ids=cms['matched_id'].astype(int).to_list()
-    #this creates an arrray of sources from my_run that have the same ids as the catalogue, with the necessary eta and V information
+    #this creates an arrray of sources from my_run that have the same ids as the catalogue, with the necessary eta and v
+    #information
     sel=my_run.sources[my_run.sources.index.isin(matched_ids)]
     
     #we already got the VAST info on our crossmatched sources through sel. we just need to filter for the highly variable
@@ -213,3 +219,32 @@ def eta_v_candidate_filter(cms,my_run,eta_thresh,v_thresh):
     print('There are',len(candidate_cms),'candidate sources:')
     
     return candidate_cms
+
+#This function helps to compartmentalise the fink querying proccess. With batching, this function can be used to query large
+#catalogues (within reason), so long as a FINK ID list is fed in.
+
+def query_fink_db(Idlist):
+    
+    #defining column array for cutouts
+    cutouts=[
+    'b:cutoutScience_stampData',
+    'b:cutoutTemplate_stampData',
+    'b:cutoutDifference_stampData'
+    ]
+
+    #this is the request made to the fink portal to pull out the info for each source
+    r = requests.post(
+      'https://fink-portal.org/api/v1/objects',
+      json={
+        'objectId': ','.join(Idlist), 
+        'output-format': 'json',
+        'withcutouts': 'True',
+        'cols': ','.join(cutouts),
+        'withupperlim': 'True' #important for lightcurve plotting
+      }
+    )
+
+    #reads in json file data as DataFrame. fsd stands for 'FINK source data'
+    fsd=pd.read_json(StringIO(r.content.decode()))
+
+    return fsd
