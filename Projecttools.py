@@ -116,7 +116,7 @@ def family_sort(cms):
 
 #defining the photometry plotting function here to save having to rerun it everytime.
 #have to load VAST run, the FINK requested sources AND the filtered candidate catalogue and feed them into the input
-def plot_lightcurves(my_run,fsd,candidates,FINK_ID,xlim,vast_ylim,fink_ylim,):
+def plot_lightcurves(my_run,fsd,candidates,FINK_ID):#,xlim,vast_ylim,fink_ylim,):
     
     gs = gridspec.GridSpec(2,1) #sets up a 2x1 grid
     vast_gs = gs[1:2] #puts the VAST axis on the bottom
@@ -129,8 +129,8 @@ def plot_lightcurves(my_run,fsd,candidates,FINK_ID,xlim,vast_ylim,fink_ylim,):
     
     vast_ax.set_position(vast_gs.get_position(fig))
     vast_ax.set_subplotspec(vast_gs)
-    vast_ax.set_xlim(xlim)
-    vast_ax.set_ylim(vast_ylim)
+    #vast_ax.set_xlim(xlim)
+    #vast_ax.set_ylim(vast_ylim)
     
     ax_new = fig.add_subplot(211, sharex=vast_ax)
     ax_new.tick_params(labelbottom=False)
@@ -170,8 +170,8 @@ def plot_lightcurves(my_run,fsd,candidates,FINK_ID,xlim,vast_ylim,fink_ylim,):
     plt.gca().invert_yaxis()
     #plt.xlabel('Modified Julian Date')
     plt.ylabel('Magnitude')
-    plt.xlim(xlim)
-    plt.ylim(fink_ylim)
+    #plt.xlim(xlim)
+    #plt.ylim(fink_ylim)
     plt.show()
     
 def plot_cutouts(my_run,fsd,candidates,FINK_ID,vast_epoch):
@@ -220,31 +220,61 @@ def eta_v_candidate_filter(cms,my_run,eta_thresh,v_thresh):
     
     return candidate_cms
 
-#This function helps to compartmentalise the fink querying proccess. With batching, this function can be used to query large
-#catalogues (within reason), so long as a FINK ID list is fed in.
+#This function will take the crossmatch catalogue and filter out sources that do not have good overlap in Optical and Radio. Please make sure that you convert all time observations into Modified Julian Dates (MJD), and that column names
+#for FINK and VAST line up with whats requested in the function. feel free to modify the function as well for your own convenience.
 
-def query_fink_db(Idlist):
+def lightcurve_overlap_filter(cms,fsd,vsd,O,R,dt=0):
     
-    #defining column array for cutouts
-    cutouts=[
-    'b:cutoutScience_stampData',
-    'b:cutoutTemplate_stampData',
-    'b:cutoutDifference_stampData'
-    ]
+    #defining empty Overlap array, which will store Booliean values
+    Overlap = []
 
-    #this is the request made to the fink portal to pull out the info for each source
-    r = requests.post(
-      'https://fink-portal.org/api/v1/objects',
-      json={
-        'objectId': ','.join(Idlist), 
-        'output-format': 'json',
-        'withcutouts': 'True',
-        'cols': ','.join(cutouts),
-        'withupperlim': 'True' #important for lightcurve plotting
-      }
-    )
+    if O <= 1 or R <= 1:
+        raise Exception('Please choose a minimum optical & radio observation overlap count greater than 1')
+    if dt < 0:
+        raise Exception ('Please choose a dt >= 0')
 
-    #reads in json file data as DataFrame. fsd stands for 'FINK source data'
-    fsd=pd.read_json(StringIO(r.content.decode()))
+    #this takes the FINK and VAST IDs from the crossmatch catalogue and puts them into a dataframe, resetting the index.
+    cml = pd.DataFrame({"FINK ID": cms['objectId'], "VAST ID": cms['matched_id']}).reset_index()
 
-    return fsd
+    #this drops the 'index' column leftover from cms_candidates
+    cml.drop('index', inplace=True, axis=1)
+    cml['VAST ID']=cml['VAST ID'].astype(int)
+
+    ftd = pd.DataFrame({"i:objectId": fsd['i:objectId'], "i:mjd":fsd['i:mjd']})
+    vtd = pd.DataFrame({"source": vsd['source'], "time_mjd": vsd['time_mjd']})
+
+    #i represents the index of the row selelcted in cml. x and y are then the FINK and VAST IDs of that row respectively
+    for i in cml.index.to_list():
+        FINK_ID,VAST_ID = cml.iloc[[i]]['FINK ID'][i], cml.iloc[[i]]['VAST ID'][i]
+
+        #these are all the rows in fsd that have the same FINK ID as the selected row in cml
+        ftd_temp = ftd[ftd['i:objectId'] == FINK_ID]
+        ftd_temp = ftd_temp.sort_values('i:mjd').reset_index()
+        ftd_temp.drop('index', inplace=True, axis=1)
+
+        #these are all the rows in vsd that have the same VAST ID as the selected row in cml
+        vtd_temp = vtd[vtd['source'] == VAST_ID]
+        vtd_temp = vtd_temp.sort_values('time_mjd').reset_index()
+        vtd_temp.drop('index', inplace=True, axis=1)
+
+        # j represents the jth index in ftd_temp. start is the start date at the jth row, end is the row O-1 steps ahead.
+        for j in ftd_temp.index.to_list():
+
+            #if we've reached the end of the list and the loop hasnt broken, it means we havent found any good overlap.
+            if j+O-1 > ftd_temp.index.to_list()[-1]:
+                Overlap.append(False)
+                break
+
+            start, end = ftd_temp.iloc[[j]]['i:mjd'][j], ftd_temp.iloc[[j+O-1]]['i:mjd'][j+O-1]
+            #this checks which points in vtd_temp are within the range between start and end, +- dt incase an observation is slightly out of this range
+            overlap_temp = vtd_temp['time_mjd'].between(start-dt,end+dt)
+
+            #If the number of points wthin that range is >= R, we have good overlap!
+            if len(overlap_temp[overlap_temp==True]) >= R:
+                Overlap.append(True)
+                break
+    
+    cml['Overlap']=Overlap
+    print('Of the',Overlap.count(False)+Overlap.count(True),'Sources that have been analyzed,',Overlap.count(True),'of them have good overlap:')
+    
+    return cml
