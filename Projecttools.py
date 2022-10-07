@@ -168,13 +168,13 @@ def plot_lightcurves(my_run,fsd,candidates,FINK_ID):#,xlim,vast_ylim,fink_ylim,)
         )
 
     plt.gca().invert_yaxis()
-    #plt.xlabel('Modified Julian Date')
+    plt.xlabel('Modified Julian Date')
     plt.ylabel('Magnitude')
     #plt.xlim(xlim)
     #plt.ylim(fink_ylim)
     plt.show()
     
-def plot_cutouts(my_run,fsd,candidates,FINK_ID,vast_epoch):
+def plot_cutouts(my_run,fsd,candidates,FINK_ID,vast_epoch=1):
     
     #defining column array for cutouts
     cutouts=[
